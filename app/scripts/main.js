@@ -1,22 +1,9 @@
 import * as config from './config.js'
 
-// Show the complaint detail
-function getComplaintDetail(e) {
-  e.stopPropagation()
-  let id = $(this).attr('data-id')
-  $.get(`${config.API_BASE}complaint/${id}`, function(data) {
-    console.log(data)
-  })
-  return false
-}
 
-// Make a complaint
-function newComplaint() {
-  let $this = $(this)
-  if ($this.hasClass('disabled'))
-    return false
-
-  let plate = $('#plate').val().toUpperCase().trim()
+// Validate plate
+function validatePLate(plate) {
+  plate = plate.toUpperCase().trim()
   let regex = /^[A-Z0-9]{6,}$/
 
   if (plate == '') {
@@ -34,6 +21,30 @@ function newComplaint() {
     return false
   }
 
+  return true
+}
+
+// Show the complaint detail
+function getComplaintDetail(e) {
+  e.stopPropagation()
+  let id = $(this).attr('data-id')
+  $.get(`${config.API_BASE}complaint/${id}`, function(data) {
+    console.log(data)
+  })
+  return false
+}
+
+// Make a complaint
+function newComplaint() {
+  let $this = $(this)
+
+  if ($this.hasClass('disabled'))
+    return false
+
+  let plate = $('#plate').val().toUpperCase().trim()
+
+  if(!validatePLate(plate)) return false
+
   $this.addClass('disabled')
 
   $.ajax({
@@ -47,6 +58,70 @@ function newComplaint() {
       console.log(data)
       $this.removeClass('disabled')
       $('#complaint-register').openModal()
+    })
+    .fail(function(xhr, status, error) {
+      console.log(xhr.responseText)
+      Materialize.toast('<span>La placa que se quiere registar ya existe o hubo algún problema al realizar tu registro</span>', 5000);
+      $this.removeClass('disabled')
+    })
+}
+
+// Search complaint by plate
+function getComplaintByPlate() {
+  let $this = $(this)
+
+  if ($this.hasClass('disabled'))
+    return false
+
+  let plate = $('#search-plate').val().toUpperCase().trim()
+
+  if(!validatePLate(plate)) return false
+
+  $this.addClass('disabled')
+  let sectionSnapshots = $('#snapshots')
+  sectionSnapshots.find('#list-snapshots').remove()
+
+  let template = `<ul id="list-snapshots" class="collection with-header">
+    <li class="collection-header"><h4>Últimos Snapshots</h4></li>
+    <li id="load-list-complaints" class="collection-item">
+      <div class="progress">
+        <div class="indeterminate"></div>
+      </div>
+    </li>
+  </ul>`
+
+  sectionSnapshots.append(template)
+  let $listSnaps = sectionSnapshots.find('#list-snapshots')
+  let progressBar = sectionSnapshots.find('#load-list-complaints')
+
+  $.ajax({
+    url: `${config.API_BASE}complaint/plate/${plate}`,
+    type: 'GET',
+    dataType: 'json'
+  })
+    .success(function(data) {
+      $this.removeClass('disabled')
+      let snapshots = data.snapshots
+
+      progressBar.fadeOut(600, function() {
+        $(this).remove()
+
+        if(snapshots.length == 0)
+          $listSnaps.append(`<li class="collection-item">
+            Lo sentimos, no hemos encontrado snapshots que coincidan con tu denuncia, seguiremos trabajando.
+          </li>`)
+        else
+          snapshots.forEach(function(snapshot) {
+            let capturedTime = new Date(Date.parse(snapshot.capturedTime)).toLocaleString()
+
+            $listSnaps.append(`<li class="collection-item">
+              <div>Fecha: ${capturedTime}</div>
+              <div>Confiabilidad: ${snapshot.confidence.toFixed(2)}%</div>
+              <div>Cámara: ${snapshot.uuidCamera}</div>
+            </li>`)
+          })
+      })
+
     })
     .fail(function(xhr, status, error) {
       console.log(xhr.responseText)
@@ -81,4 +156,7 @@ $(function () {
 
   // Initialize event click to send new complaint
   $('#new-complaint').click(newComplaint)
+
+  // Initialize event click to search complaint by plate
+  $('#search-complaint').click(getComplaintByPlate)
 })
