@@ -55,12 +55,10 @@ function newComplaint() {
     dataType: 'json'
   })
     .success(function(data) {
-      console.log(data)
       $this.removeClass('disabled')
       $('#complaint-register').openModal()
     })
     .fail(function(xhr, status, error) {
-      console.log(xhr.responseText)
       Materialize.toast('<span>La placa que se quiere registar ya existe o hubo algún problema al realizar tu registro</span>', 5000);
       $this.removeClass('disabled')
     })
